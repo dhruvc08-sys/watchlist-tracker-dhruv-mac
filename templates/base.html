@@ -1,0 +1,21 @@
+<!-- This is the base set of code for every page -->
+<!-- Includes the title -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Watchlist Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-black text-white">
+
+  <h1 class="font-semibold mt-2 mb-2 border-2">Watchlist Tracker</h1>
+
+  <main>
+    {% block content %} <!-- for other pages to fill in -->
+    {% endblock %}
+  </main>
+
+</body>
+</html>
