@@ -13,6 +13,7 @@ import asyncio
 from uuid import UUID
 ################################################
 
+TMDB_READ_TOKEN = os.environ["TMDB_READ_TOKEN"].strip()
 app=FastAPI()
 templates = Jinja2Templates(directory="templates")
 
@@ -138,7 +139,7 @@ async def homepage(request: Request, query: str = "", session_token: str | None 
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 "https://api.themoviedb.org/3/search/movie",
-                headers={"Authorization": f"Bearer {os.environ['TMDB_READ_TOKEN']}"},
+                headers={"Authorization": f"Bearer {TMDB_READ_TOKEN}"},
                 params={"query": query},
             )
             movies = response.json()["results"]
@@ -177,7 +178,7 @@ async def add_to_watchlist(
         async with httpx.AsyncClient() as client:
             details_response = await client.get(
                 f"https://api.themoviedb.org/3/movie/{tmdb_id}",
-                headers={"Authorization": f"Bearer {os.environ['TMDB_READ_TOKEN']}"},
+                headers={"Authorization": f"Bearer {TMDB_READ_TOKEN}"},
             )
 
             details_response.raise_for_status()
