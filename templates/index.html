@@ -6,11 +6,16 @@
 <p class="text-sm text-zinc-500 mt-2">Search The Movie Database and add anything you want to watch.</p>
 
 <!-- Search Form -->
-<form method="get" action="/" class="mt-6 flex gap-2">
-    <input type="text" name="query" value="{{ query }}" placeholder="Search by title, e.g. Inception"
+<form method="get" action="/" class="mt-6 flex gap-2" onsubmit="const b = this.querySelector('button'); b.disabled = true; b.textContent = 'Searching...';">
+    <input type="text" name="query" value="{{ query }}" placeholder="Search by title, e.g. Intersellar" required
         class="flex-1 px-4 py-3 bg-white border border-zinc-300 rounded-xl focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
     <button type="submit" class="px-5 py-3 text-sm font-medium bg-sky-600 text-white hover:bg-sky-700 rounded-xl">Search</button>
 </form>
+
+{% if query and not movies %}
+    <p class="mt-8 text-sm text-zinc-500">No movies found for "{{ query }}</p>
+{% endif %}
+
 
 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mt-8">
 {% for movie in movies %}
@@ -21,17 +26,16 @@
             <p class="text-sm text-zinc-500">{{ movie.release_date[:4] }}</p>
 
             {% if movie.id in added_ids %}
-                <button disabled class="mt-auto w-full px-3 py-1.5 text-sm bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
-                    ✓ Added to watchlist
-                </button>
-            {% else %}
-                <form method="post" action="/watchlist/add" class="mt-auto">
+                {% include "partials/added_button.html" %}
+            {% elif request.cookies.get("session_token") %}
+                <form method="post" action="/watchlist/add" class="mt-auto" hx-post="/watchlist/add" hx-swap="outerHTML"
+                hx-on::before-request="const b = this.querySelector('button'); b.disabled = true; b.textContent = 'Adding...';">
                     <input type="hidden" name="tmdb_id" value="{{ movie.id }}">
-                    <input type="hidden" name="title" value="{{ movie.title }}">
-                    <input type="hidden" name="poster_path" value="{{ movie.poster_path }}">
                     <input type="hidden" name="query" value="{{ query }}">
                     <button type="submit" class="w-full mt-2 px-3 py-1.5 text-sm bg-sky-600 text-white hover:bg-sky-700 rounded-md">Add to Watchlist</button>
                 </form>
+            {% else %}
+                <a href="/signin" class="mt-auto block text-center w-full px-3 py-1.5 text-sm border border-zinc-300 text-zinc-700 hover:bg-zinc-100 rounded-md">Sign in to add a movie to your watchlist</a>
             {% endif %}
         </div>
     {% endif %}

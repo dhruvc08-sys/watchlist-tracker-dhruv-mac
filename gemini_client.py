@@ -7,18 +7,18 @@ from pydantic import BaseModel
 load_dotenv()
 
 gemini = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-MODEL = "gemini-3.8-flash"
+MODELS = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite"]
 
-# Reccomendation 
+# Recommendation 
 
-class Reccomendation(BaseModel):
+class Recommendation(BaseModel):
     movie_name: str
     movie_year: int
     why_it_fits: str
 
 # Response 
 
-class Tasteprofile(BaseModel):
+class TasteProfile(BaseModel):
     headline: str
     taste: str
-    recommendations: list[Reccomendation]
+    recommendations: list[Recommendation]

@@ -1,1 +1,51 @@
 {% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="text-4xl font-bold">Your taste</h1>
+<p class="text-sm text-zinc-500 mt-2">Based on your watchlist and hisotry, we'll evaluate your taste profile and provide you some other movie reccomendations!</p>
+
+{% if total_watched == 0 %}
+    <div class="mt-8 border border-dashed border-zinc-300 rounded-xl p-10 text-center">
+        <p class="font-medium">Nothing to analyse yet</p>
+        <p class="text-sm text-zinc-500 mt-1">Mark a few movies as watched (and rate them) to get your taste profile.</p>
+        <a href="/watchlist" class="inline-block mt-4 px-4 py-2 text-sm bg-sky-600 text-white hover:bg-sky-700 rounded-md">Go to watchlist</a>
+    </div>
+{% else %}
+
+    {% if error %}
+        <p class="mt-6 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{{ error }}</p>
+    {% endif %}
+
+    {% if taste %}
+        <!-- Profile -->
+        <div class="mt-8 border border-zinc-200 rounded-xl p-6">
+            <p class="text-xs font-medium uppercase tracking-wide text-sky-700">Your taste profile</p>
+            <p class="text-2xl font-bold mt-2">{{ taste.headline }}</p>
+            <p class="text-zinc-600 mt-3 leading-relaxed">{{ taste.taste }}</p>
+        </div>
+
+        <!-- Recommendations -->
+        <h2 class="text-xl font-semibold mt-10">Recommended for you</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {% for rec in taste.recommendations %}
+                <div class="border border-zinc-200 rounded-xl p-5">
+                    <p class="font-semibold">{{ rec.movie_name }} <span class="font-normal text-zinc-400">({{ rec.movie_year }})</span></p>
+                    <p class="text-sm text-zinc-600 mt-2">{{ rec.why_it_fits }}</p>
+                    <a href="/?query={{ rec.movie_name | urlencode }}" class="inline-block mt-3 text-sm text-sky-700 hover:underline">Search for this →</a>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- Generate button (disables itself + shows loading text while Gemini works) -->
+    <form method="post" action="/taste" class="mt-8"
+          onsubmit="const b = this.querySelector('button'); b.disabled = true; b.textContent = 'Analysing your history… (this takes a few seconds)';">
+        <button type="submit" class="px-5 py-2.5 text-sm font-medium bg-sky-600 text-white hover:bg-sky-700 rounded-md disabled:opacity-60 disabled:cursor-wait">
+            {% if taste %}Regenerate{% else %}Generate my taste profile{% endif %}
+        </button>
+    </form>
+
+{% endif %}
+
+{% endblock %}

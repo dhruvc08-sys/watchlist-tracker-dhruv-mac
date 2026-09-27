@@ -3,10 +3,15 @@ from fastapi.templating import Jinja2Templates
 import httpx
 from supabase_client import supabase, new_client, get_user_client
 from urllib.parse import quote_plus
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 import os
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+from gemini_client import gemini, MODELS, TasteProfile
+from google.genai import types
+import asyncio
+from uuid import UUID
+from datetime import datetime
 ################################################
 
 app=FastAPI()
@@ -136,22 +141,26 @@ async def homepage(request: Request, query: str = "", session_token: str | None 
 async def add_to_watchlist(
     request: Request,
     tmdb_id: int = Form(...),
-    title: str = Form(...),
-    poster_path: str = Form(...),
     query: str = Form(""),
     user = Depends(get_current_user),
     db = Depends(get_db),
 ):
+
+    # HTMX sends this header when the button is clicked
+    # We reply with just the new button 
+    is_htmx = request.headers.get("HX-Request") == "true"
     back_to_search = f"/?query={quote_plus(query)}"
+
     try:
         async with httpx.AsyncClient() as client:
             details_response = await client.get(
                 f"https://api.themoviedb.org/3/movie/{tmdb_id}",
                 headers={"Authorization": f"Bearer {os.environ['TMDB_READ_TOKEN']}"},
             )
+
+            details_response.raise_for_status()
             details = details_response.json()
 
-        genre_ids = [g["id"] for g in details.get("genres", [])]
 
         insert_result = db.table("watchlist_entries").insert({
             "user_id": user.id,
@@ -161,17 +170,23 @@ async def add_to_watchlist(
         }).execute()
 
         new_entry_id = insert_result.data[0]["id"]
+        genre_ids = [g["id"] for g in details.get("genres", [])]
 
         if genre_ids:
             db.table("entry_genres").insert(
                 [{"entry_id": new_entry_id, "genre_id": g_id} for g_id in genre_ids]
             ).execute()
 
+        if is_htmx:
+            return templates.TemplateResponse(request=request, name="partials/added_button.html", context={})
         return RedirectResponse(url=back_to_search, status_code=303)
+    
     except Exception as error_message:
         print("ADD FAILED:", error_message)
+        if is_htmx:
+            return HTMLResponse('<p class="mt-auto text-sm text-red-700"> Could not add this movie to the watchlist. Refresh and try again.</p>')
         return RedirectResponse(url=back_to_search, status_code=303)
-
+        
 
 # watch / rate / remove routes
 
@@ -226,3 +241,90 @@ async def stats_page(request: Request, user = Depends(get_current_user), db = De
         },
     )
 
+# taste
+
+@app.get("/taste")
+async def taste_page(request: Request, user = Depends(get_current_user), db = Depends(get_db)):
+    watched = get_watched_with_genres(db, user.id)
+    return templates.TemplateResponse(
+        request=request, name="taste.html",
+        context={
+            "total_watched": len(watched),
+            "taste": None,
+        },
+    )
+
+def build_taste_prompt(watched):
+    summary = []
+    for movie in watched:
+        rating = movie["rating"]
+        genres_text = ", ".join(movie["genres"])
+        if rating is not None:
+            summary.append(f"- {movie["title"]}; rated {rating}/10; genres: {genres_text}")
+        else:
+            summary.append(f"- {movie["title"]}; not rated; genres: {genres_text}")
+
+    movie_list = "\n".join(summary)
+
+    return f"""You are an expert in all movies, what they're about, their genre and taste.
+    You are responsible, as an advisor, to read and understand someone's watch history and generate 
+    a taste profile which will involve curating what genres they lean towards and what movies you personally
+    reccomend for them depending on their taste profile. 
+
+    Their watch history will include the title of each movie, what they rated the movie out of 10 (so you
+    can understand the person's own enjoyment of the movie) and a list of genres that movie covers.
+    
+    **Rules**
+    
+    - What to write for the profile / what the output should look like: a short one-line headline, plus a paragraph
+    on the genres, themes, or kinds of story they lean towards, and what their rating suggests about what they love
+
+    - When providing movie reccomendations, provide 3
+
+    - Grounding: every reason must name at least one specific movie from their watch history and explain the connection
+    in a couple of words.
+
+    - What not to reccomend: do not recommend anything already in their watch history
+
+    - What to do with unrated movies: if a movie is "not rated", it means it they have watched it,
+    but are they yet to rate it. It doesn't mean they didn't like the movie. 
+    
+    Here is their watch history:
+    {movie_list}
+    """
+    
+
+
+
+@app.post("/taste")
+async def generate_taste(request: Request, user = Depends(get_current_user), db = Depends(get_db)):
+    watched = get_watched_with_genres(db, user.id)
+    taste = None
+    error = None
+
+    if watched:
+        prompt = build_taste_prompt(watched)
+        for model in MODELS:
+            try:
+                response = await gemini.aio.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=TasteProfile,
+                    ),
+                )
+                taste = response.parsed
+                print("TASTE OK with", model, type(taste))
+                break                                  # got an answer, stop trying
+            except Exception as error_message:
+                print(f"TASTE FAILED with {model}:", error_message)
+                await asyncio.sleep(1)                 # brief pause before the next model
+
+        if taste is None:
+            error = "Our AI model is busy right now. Please try again in a minute."
+
+    return templates.TemplateResponse(
+        request=request, name="taste.html",
+        context={"total_watched": len(watched), "taste": taste, "error": error},
+    )
