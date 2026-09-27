@@ -12,25 +12,24 @@
 
   <!-- Nav -->
   <nav class="border-b border-zinc-200">
-    <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-y-2">
 
-      <!-- Left: logo + links -->
-      <div class="flex items-center gap-6">
-        <a href="/" class="font-semibold flex items-center gap-2">
+      <!-- Logo + links -->
+      <a href="/" class="font-semibold flex items-center gap-2">
           <span class="text-sky-500">🎬</span> Watchlist Tracker
-        </a>
-        <div class="flex items-center gap-1 text-sm">
-          {% set path = request.url.path %}
-          {% for href, label in [("/", "Search"), ("/watchlist", "Watchlist"), ("/stats", "Stats"), ("/taste", "Taste")] %}
-            <a href="{{ href }}"
-               class="px-3 py-1.5 rounded-md {% if path == href %}bg-sky-50 text-sky-700{% else %}text-zinc-500 hover:text-zinc-900{% endif %}">
-              {{ label }}
-            </a>
-          {% endfor %}
-        </div>
+      </a>
+
+      <div class="flex items-center gap-1 text-sm">
+        {% set path = request.url.path %}
+        {% for href, label in [("/", "Search"), ("/watchlist", "Watchlist"), ("/stats", "Stats"), ("/taste", "Taste")] %}
+          <a href="{{ href }}"
+            class="px-3 py-1.5 rounded-md whitespace-nowrap {% if path == href %}bg-sky-50 text-sky-700{% else %}text-zinc-500 hover:text-zinc-900{% endif %}">
+            {{ label }}
+          </a>
+        {% endfor %}
       </div>
 
-      <!-- Right: account -->
+      <!-- Account -->
       {% if request.cookies.get("session_token") %}
         {% set email = request.cookies.get("user_email", "") %}
         <div class="flex items-center gap-3 text-sm">
