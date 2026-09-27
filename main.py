@@ -44,15 +44,20 @@ async def signin(request: Request, email: str = Form(...), password: str = Form(
     try:
         result = new_client().auth.sign_in_with_password({"email": email, "password": password})
         response = RedirectResponse(url="/", status_code=303)
+        # Supabase access tokens expire (usually after 1 hour). Make the cookies expire at the
+        # same time, so the app never holds a dead token that still "looks" signed in.
+        max_age = result.session.expires_in
         response.set_cookie(
             key="session_token",
             value=result.session.access_token,
             httponly=True,
+            max_age=max_age,
         )
         response.set_cookie(
             key="user_email",
             value=result.user.email,
             httponly=True,
+            max_age=max_age,
         )
         return response
     except Exception as error_message:
@@ -60,19 +65,28 @@ async def signin(request: Request, email: str = Form(...), password: str = Form(
             request=request, name="signin.html", context={"error": str(error_message)}
         )
 
-def get_current_user(session_token: str | None = Cookie(default=None)):
+def signin_redirect(request: Request):
+    # HTMX requests (e.g. "Add to Watchlist") would follow a normal redirect in the background
+    # and paste the whole sign-in page into the movie card. The HX-Redirect header tells
+    # HTMX to navigate the full page to /signin instead.
+    if request.headers.get("HX-Request") == "true":
+        return HTTPException(status_code=401, headers={"HX-Redirect": "/signin"})
+    return HTTPException(status_code=303, headers={"Location": "/signin"})
+
+
+def get_current_user(request: Request, session_token: str | None = Cookie(default=None)):
     if session_token is None:
-        raise HTTPException(status_code=303, headers={"Location": "/signin"})
+        raise signin_redirect(request)
     try:
         result = supabase.auth.get_user(session_token)
         return result.user
     except Exception:
-        raise HTTPException(status_code=303, headers={"Location": "/signin"})
+        raise signin_redirect(request)
 
 
-def get_db(session_token: str | None = Cookie(default=None)):
+def get_db(request: Request, session_token: str | None = Cookie(default=None)):
     if session_token is None:
-        raise HTTPException(status_code=303, headers={"Location": "/signin"})
+        raise signin_redirect(request)
     return get_user_client(session_token)
 
 
