@@ -25,7 +25,7 @@ async def signup_page(request: Request):
 @app.post("/signup")
 async def signup(request: Request, email: str = Form(...), password: str = Form(...)):
     try:
-        auth_client = new_client()  # fresh client
+        auth_client = new_client()  # fresh client (so the shared client never gets signed in as this user)
         result = auth_client.auth.sign_up({"email": email, "password": password})
         # One profile row per user, where its primary key is the Supabase auth user id
         auth_client.table("profiles").insert({"id": result.user.id}).execute()
@@ -228,6 +228,7 @@ async def add_to_watchlist(
 
 # watch / rate / remove routes
 # entry_id is typed as UUID, so a malformed id is rejected with a 422
+# Every query also filters by user_id, so someone else's valid id matches nothing
 
 @app.post("/watchlist/{entry_id}/watch")
 async def mark_watched(entry_id: UUID, user = Depends(get_current_user), db = Depends(get_db)):
@@ -394,7 +395,7 @@ async def generate_taste(request: Request, user = Depends(get_current_user), db 
                 await asyncio.sleep(1)                 # brief pause before the next model (if needed)
 
         if taste is None:
-            error = "Our AI model is busy right now. Please try again in a minute." # if all models don't respond
+            error = "Our AI model is busy right now. Please try again in a minute." # if all models fail
         else:
             # Look up all recommendations on TMDB at the same time (asyncio.gather), not one after another
             async with httpx.AsyncClient() as client:
