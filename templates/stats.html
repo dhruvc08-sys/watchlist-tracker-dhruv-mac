@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="text-4xl font-bold">Your stats</h1>
+<p class="text-sm text-zinc-500 mt-2">What you've watched, how you've rated it, and the genres you lean towards.</p>
+
+{% if total_watched == 0 %}
+    <div class="mt-8 border border-dashed border-zinc-300 rounded-xl p-10 text-center">
+        <p class="font-medium">No watched movies yet</p>
+        <p class="text-sm text-zinc-500 mt-1">Mark something as watched on your watchlist and your stats will show up here.</p>
+        <a href="/watchlist" class="inline-block mt-4 px-4 py-2 text-sm bg-sky-600 text-white hover:bg-sky-700 rounded-md">Go to watchlist</a>
+    </div>
+{% else %}
+
+    <!-- Summary cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
+        <div class="border border-zinc-200 rounded-xl p-5">
+            <p class="text-sm text-zinc-500">Movies watched</p>
+            <p class="text-3xl font-bold mt-1">{{ total_watched }}</p>
+        </div>
+        <div class="border border-zinc-200 rounded-xl p-5">
+            <p class="text-sm text-zinc-500">Average rating</p>
+            <p class="text-3xl font-bold mt-1">
+                {% if average is not none %}{{ average }}<span class="text-base font-normal text-zinc-400"> / 10</span>{% else %}–{% endif %}
+            </p>
+        </div>
+        <div class="border border-zinc-200 rounded-xl p-5">
+            <p class="text-sm text-zinc-500">Rated</p>
+            <p class="text-3xl font-bold mt-1">{{ rated_count }}<span class="text-base font-normal text-zinc-400"> of {{ total_watched }}</span></p>
+        </div>
+    </div>
+
+    <!-- Genre breakdown -->
+    <div class="border border-zinc-200 rounded-xl p-5 mt-4">
+        <p class="font-semibold">Genres</p>
+        <p class="text-sm text-zinc-500">A movie with several genres counts towards each one.</p>
+        <div class="mt-4 flex flex-col gap-3">
+            {% for genre, count in genre_counts %}
+                <div class="flex items-center gap-3 text-sm">
+                    <span class="w-32 shrink-0">{{ genre }}</span>
+                    <div class="flex-1 bg-zinc-100 rounded-full h-2">
+                        <div class="bg-sky-500 h-2 rounded-full" style="width: {{ (count / top_count * 100) | round }}%"></div>
+                    </div>
+                    <span class="w-6 text-right text-zinc-500">{{ count }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+{% endif %}
+
+{% endblock %}

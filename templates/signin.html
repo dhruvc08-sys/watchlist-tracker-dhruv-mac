@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-sm mx-auto mt-10">
+    <h1 class="text-3xl font-bold">Sign in</h1>
+    <p class="text-sm text-zinc-500 mt-2">Welcome back. Sign in to see your watchlist.</p>
+
+    {% if error %}
+        <p class="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{{ error }}</p>
+    {% endif %}
+
+    <form method="post" action="/signin" class="mt-6 flex flex-col gap-4">
+        <label class="text-sm font-medium">Email
+            <input type="email" name="email" required
+                   class="mt-1 w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
+        </label>
+        <label class="text-sm font-medium">Password
+            <input type="password" name="password" required
+                   class="mt-1 w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
+        </label>
+        <button type="submit" class="w-full px-3 py-2 text-sm font-medium bg-sky-600 text-white hover:bg-sky-700 rounded-md">Sign in</button>
+    </form>
+
+    <p class="text-sm text-zinc-500 mt-4">Need an account? <a href="/signup" class="text-sky-700 hover:underline">Sign up</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="text-4xl font-bold">Your watchlist</h1>
+<p class="text-sm text-zinc-500 mt-2">What you plan to watch, and what you've already seen and rated.</p>
+
+{% if not entries %}
+    <div class="mt-8 border border-dashed border-zinc-300 rounded-xl p-10 text-center">
+        <p class="font-medium">Your watchlist is empty</p>
+        <p class="text-sm text-zinc-500 mt-1">Search for a movie and add it to get started.</p>
+        <a href="/" class="inline-block mt-4 px-4 py-2 text-sm bg-sky-600 text-white hover:bg-sky-700 rounded-md">Find a movie</a>
+    </div>
+{% endif %}
+
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mt-8">
+    {% for entry in entries %}
+        <div class="flex flex-col">
+            {% if entry.poster_path %}
+                <img class="w-full aspect-[2/3] object-cover rounded-xl shadow-sm" src="https://image.tmdb.org/t/p/w500{{ entry.poster_path }}" alt="{{ entry.title }} Poster">
+            {% endif %}
+            <p class="text-sm font-semibold mt-2 line-clamp-2">{{ entry.title }}</p>
+
+            {% if entry.watched_at %}
+                <p class="text-sm text-zinc-500">
+                    {% if entry.rating %}Rated {{ entry.rating }}/10{% else %}Watched, not rated{% endif %}
+                </p>
+            {% endif %}
+
+            <!-- Buttons pinned to the bottom of the card -->
+            <div class="mt-auto">
+                {% if entry.watched_at %}
+                    {% if not entry.rating %}
+                        <form method="post" action="/watchlist/{{ entry.id }}/rate" class="flex gap-2 mt-2">
+                            <input type="number" name="rating" min="1" max="10" required placeholder="1-10"
+                                   class="w-16 px-2 py-1 text-sm border border-zinc-300 rounded-md">
+                            <button type="submit" class="flex-1 px-3 py-1.5 text-sm bg-sky-600 text-white hover:bg-sky-700 rounded-md">Rate</button>
+                        </form>
+                    {% endif %}
+                {% else %}
+                    <form method="post" action="/watchlist/{{ entry.id }}/watch">
+                        <button type="submit" class="w-full mt-2 px-3 py-1.5 text-sm bg-sky-600 text-white hover:bg-sky-700 rounded-md">Mark as watched</button>
+                    </form>
+                {% endif %}
+
+                <form method="post" action="/watchlist/{{ entry.id }}/remove">
+                    <button type="submit" class="w-full mt-2 px-3 py-1.5 text-sm border border-zinc-300 text-zinc-600 hover:bg-zinc-100 rounded-md">Remove</button>
+                </form>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+{% endblock %}
+
+
+
+

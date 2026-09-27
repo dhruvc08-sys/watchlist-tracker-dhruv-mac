@@ -2,50 +2,40 @@
 
 {% block content %}
 
-<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+<h1 class="text-4xl font-bold">Find a movie</h1>
+<p class="text-sm text-zinc-500 mt-2">Search The Movie Database and add anything you want to watch.</p>
 
-      <!-- Poster 1 -->
-    <div>
-        <img class="w-full rounded-lg" src="https://image.tmdb.org/t/p/w500/xlaY2zyzMfkhk0HSC5VUwzoZPU1.jpg" alt="Inception Poster">
-        <p class="text-sm font-semibold mt-2">Title: Inception</p>
-        <p class="text-sm text-gray-400">Year: 2010</p>
-    </div>
+<!-- Search Form -->
+<form method="get" action="/" class="mt-6 flex gap-2">
+    <input type="text" name="query" value="{{ query }}" placeholder="Search by title, e.g. Inception"
+        class="flex-1 px-4 py-3 bg-white border border-zinc-300 rounded-xl focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
+    <button type="submit" class="px-5 py-3 text-sm font-medium bg-sky-600 text-white hover:bg-sky-700 rounded-xl">Search</button>
+</form>
 
-      <!-- Poster 2 -->
-    <div>
-        <img class="w-full rounded-lg mt-2"src="https://image.tmdb.org/t/p/w500/bjiS5ipwxb9JFy3XRRN4OAilSeX.jpg" alt="Spider-Man: Brand New Day Poster">
-        <p class="text-sm font-semibold mt-2">Title: Spider-Man: Brand New Day</p>
-        <p class="text-sm text-gray-400">Year: 2026</p>
-    </div>
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mt-8">
+{% for movie in movies %}
+    {% if movie.poster_path %}
+        <div class="flex flex-col">
+            <img class="w-full aspect-[2/3] object-cover rounded-xl shadow-sm" src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" alt="{{ movie.title }} Poster">
+            <p class="text-sm font-semibold mt-2 line-clamp-2">{{ movie.title }}</p>
+            <p class="text-sm text-zinc-500">{{ movie.release_date[:4] }}</p>
 
-    <!-- Poster 3 -->
-    <div>
-        <img class="w-full rounded-lg mt-2"src="https://image.tmdb.org/t/p/w500/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg" alt="Spider-Man: No Way Home Poster">
-        <p class="text-sm font-semibold mt-2">Title: Spider-Man: No Way Home</p>
-        <p class="text-sm text-gray-400">Year: 2021</p>
-    </div>
-
-    <!-- Poster 4 -->
-    <div>
-        <img class="w-full rounded-lg mt-2"src="https://image.tmdb.org/t/p/w500/4q2NNj4S5dG2RLF9CpXsej7yXl.jpg" alt="Spider-Man: Far From Home Poster">
-        <p class="text-sm font-semibold mt-2">Title: Spider-Man: Far From Home</p>
-        <p class="text-sm text-gray-400">Year: 2019</p>
-    </div>
-
-    <!-- Poster 5 -->
-    <div>
-        <img class="w-full rounded-lg mt-2"src="https://image.tmdb.org/t/p/w500/c24sv2weTHPsmDa7jEMN0m2P3RT.jpg" alt="Spider-Man: Homecoming Poster">
-        <p class="text-sm font-semibold mt-2">Title: Spider-Man: Homecoming</p>
-        <p class="text-sm text-gray-400">Year: 2017</p>
-    </div>
-
-    <!-- Poster 6 -->
-    <div>
-        <img class="w-full rounded-lg mt-2"src="https://image.tmdb.org/t/p/w500/jexoNYnPd6vVrmygwF6QZmWPFdu.jpg" alt="The Amazing Spider-Man 1 Poster">
-        <p class="text-sm font-semibold mt-2">Title: The Amazing Spider-Man</p>
-        <p class="text-sm text-gray-400">Year: 2012</p>
-    </div>
-
+            {% if movie.id in added_ids %}
+                <button disabled class="mt-auto w-full px-3 py-1.5 text-sm bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
+                    ✓ Added to watchlist
+                </button>
+            {% else %}
+                <form method="post" action="/watchlist/add" class="mt-auto">
+                    <input type="hidden" name="tmdb_id" value="{{ movie.id }}">
+                    <input type="hidden" name="title" value="{{ movie.title }}">
+                    <input type="hidden" name="poster_path" value="{{ movie.poster_path }}">
+                    <input type="hidden" name="query" value="{{ query }}">
+                    <button type="submit" class="w-full mt-2 px-3 py-1.5 text-sm bg-sky-600 text-white hover:bg-sky-700 rounded-md">Add to Watchlist</button>
+                </form>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endfor %}
 </div>
 
 {% endblock %}
