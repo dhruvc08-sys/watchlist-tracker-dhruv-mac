@@ -307,10 +307,10 @@ def build_taste_prompt(watched):
     
     **Rules**
     
-    - What to write for the profile / what the output should look like: a short one-line headline, plus 2-3 lines
-    on the genres, themes, or kinds of story they lean towards, and what their rating suggests about what they love
+    - What to write for the profile: a short one-line headline, plus 2-3 sentences on the genres, themes,
+    or kinds of story they lean towards, and what their ratings suggest about what they love versus merely like
 
-    - When providing movie recommendations, provide 3
+    - When providing movie recommendations, provide exactly 5
 
     - Grounding: every reason must name at least one specific movie from their watch history and explain the connection
     in a couple of words.
@@ -318,17 +318,34 @@ def build_taste_prompt(watched):
     - What not to recommend: do not recommend anything already in their watch history
 
     - What to do with unrated movies: if a movie is "not rated", it means it they have watched it,
-    but are yet to rate it. It doesn't mean they didn't like the movie. 
+    but have not rated it yet. It doesn't mean they didn't like the movie. 
     
     Here is their watch history:
     {movie_list}
     """
     
+async def find_on_tmdb(client, title, year):
+    # Gemini only gives us a title and year, so look the movie up on TMDB to get its id and poster.
+    # Returns the best match, or None if TMDB has nothing (or the request fails).
+    try:
+        response = await client.get(
+            "https://api.themoviedb.org/3/search/movie",
+            headers={"Authorization": f"Bearer {TMDB_READ_TOKEN}"},
+            params={"query": title, "primary_release_year": year},
+        )
+        results = response.json().get("results", [])
+        return results[0] if results else None
+    except Exception:
+        return None
+
+
 @app.post("/taste")
 async def generate_taste(request: Request, user = Depends(get_current_user), db = Depends(get_db)):
     watched = get_watched_with_genres(db, user.id)
     taste = None
     error = None
+    recommendations = []
+    added_ids = set()
 
     if watched:
         prompt = build_taste_prompt(watched)
@@ -343,16 +360,40 @@ async def generate_taste(request: Request, user = Depends(get_current_user), db 
                     ),
                 )
                 taste = response.parsed
-                print("TASTE OK with", model, type(taste))
+                print("TASTE OK with", model)
                 break                                  # got an answer, stop trying
             except Exception as error_message:
                 print(f"TASTE FAILED with {model}:", error_message)
-                await asyncio.sleep(1)                 # brief pause before the next model
+                await asyncio.sleep(1)                 # brief pause before trying the next model
 
         if taste is None:
             error = "Our AI model is busy right now. Please try again in a minute."
+        else:
+            # Look up all recommendations on TMDB 
+            async with httpx.AsyncClient() as client:
+                matches = await asyncio.gather(
+                    *[find_on_tmdb(client, rec.movie_name, rec.movie_year) for rec in taste.recommendations]
+                )
+            for rec, match in zip(taste.recommendations, matches):
+                if match:  # skip anything TMDB couldn't find, so every card can be added
+                    recommendations.append({
+                        "id": match["id"],
+                        "title": match["title"],
+                        "year": (match.get("release_date") or "")[:4],
+                        "poster_path": match.get("poster_path"),
+                        "reason": rec.why_it_fits,
+                    })
+            # So recommendations already on the watchlist show "Added" instead of the button
+            rows = db.table("watchlist_entries").select("tmdb_id").eq("user_id", user.id).execute().data
+            added_ids = {row["tmdb_id"] for row in rows}
 
     return templates.TemplateResponse(
         request=request, name="taste.html",
-        context={"total_watched": len(watched), "taste": taste, "error": error},
+        context={
+            "total_watched": len(watched),
+            "taste": taste,
+            "recommendations": recommendations,
+            "added_ids": added_ids,
+            "error": error,
+        },
     )

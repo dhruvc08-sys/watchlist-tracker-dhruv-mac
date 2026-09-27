@@ -28,12 +28,7 @@
             {% if movie.id in added_ids %}
                 {% include "partials/added_button.html" %}
             {% elif request.cookies.get("session_token") %}
-                <form method="post" action="/watchlist/add" class="mt-auto" hx-post="/watchlist/add" hx-swap="outerHTML"
-                hx-on::before-request="const b = this.querySelector('button'); b.disabled = true; b.textContent = 'Adding...';">
-                    <input type="hidden" name="tmdb_id" value="{{ movie.id }}">
-                    <input type="hidden" name="query" value="{{ query }}">
-                    <button type="submit" class="w-full mt-2 px-3 py-1.5 text-sm bg-sky-600 text-white hover:bg-sky-700 rounded-md">Add to Watchlist</button>
-                </form>
+                {% include "partials/add_button.html" %}
             {% else %}
                 <a href="/signin" class="mt-auto block text-center w-full px-3 py-1.5 text-sm border border-zinc-300 text-zinc-700 hover:bg-zinc-100 rounded-md">Sign in to add a movie to your watchlist</a>
             {% endif %}
