@@ -103,9 +103,18 @@ async def signout():
 
 @app.get("/watchlist")
 async def watchlist_page(request: Request, user = Depends(get_current_user), db = Depends(get_db)):
-    entries = db.table("watchlist_entries").select("*").eq("user_id", user.id).execute().data
+    entries = (
+        db.table("watchlist_entries").select("*")
+        .eq("user_id", user.id)
+        .order("added_at", desc=True)
+        .execute().data
+    )
+    # Split into the two sections: not watched yet vs watched
+    to_watch = [e for e in entries if not e["watched_at"]]
+    watched = [e for e in entries if e["watched_at"]]
     return templates.TemplateResponse(
-        request=request, name="watchlist.html", context={"entries": entries}
+        request=request, name="watchlist.html",
+        context={"to_watch": to_watch, "watched": watched},
     )
 
 
@@ -191,7 +200,7 @@ async def add_to_watchlist(
 # watch / rate / remove routes
 
 @app.post("/watchlist/{entry_id}/watch")
-async def mark_watched(entry_id: str, user = Depends(get_current_user), db = Depends(get_db)):
+async def mark_watched(entry_id: UUID, user = Depends(get_current_user), db = Depends(get_db)):
     db.table("watchlist_entries").update(
         {"watched_at": datetime.now(ZoneInfo("Australia/Melbourne")).isoformat()}
     ).eq("id", entry_id).eq("user_id", user.id).execute()
@@ -199,11 +208,19 @@ async def mark_watched(entry_id: str, user = Depends(get_current_user), db = Dep
 
 
 @app.post("/watchlist/{entry_id}/rate")
-async def rate_movie(entry_id: str, rating: int = Form(...), user = Depends(get_current_user), db = Depends(get_db)):
+async def rate_movie(entry_id: UUID, rating: int = Form(...), user = Depends(get_current_user), db = Depends(get_db)):
     if 1 <= rating <= 10:
         db.table("watchlist_entries").update(
             {"rating": rating}
         ).eq("id", entry_id).eq("user_id", user.id).execute()
+    return RedirectResponse(url="/watchlist", status_code=303)
+
+
+@app.post("/watchlist/{entry_id}/unrate")
+async def clear_rating(entry_id: UUID, user = Depends(get_current_user), db = Depends(get_db)):
+    db.table("watchlist_entries").update(
+        {"rating": None}
+    ).eq("id", entry_id).eq("user_id", user.id).execute()
     return RedirectResponse(url="/watchlist", status_code=303)
 
 
