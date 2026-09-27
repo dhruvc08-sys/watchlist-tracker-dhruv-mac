@@ -274,6 +274,16 @@ async def stats_page(request: Request, user = Depends(get_current_user), db = De
 
 # taste
 
+@app.get("/taste")
+async def taste_page(request: Request, user = Depends(get_current_user), db = Depends(get_db)):
+    # Just shows the page + Generate button. Gemini only runs when the button is pressed (POST below).
+    watched = get_watched_with_genres(db, user.id)
+    return templates.TemplateResponse(
+        request=request, name="taste.html",
+        context={"total_watched": len(watched), "taste": None},
+    )
+
+
 def build_taste_prompt(watched, to_watch_titles):
     summary = []
     for movie in watched:
@@ -316,21 +326,6 @@ def build_taste_prompt(watched, to_watch_titles):
     Already on their watchlist (not watched yet), so do not recommend these either:
     {to_watch_list}
     """
-
-async def find_on_tmdb(client, title, year):
-    # Gemini only gives us a title and year, so look the movie up on TMDB to get its id and poster.
-    # Returns the best match, or None if TMDB has nothing (or the request fails).
-    try:
-        response = await client.get(
-            "https://api.themoviedb.org/3/search/movie",
-            headers={"Authorization": f"Bearer {TMDB_READ_TOKEN}"},
-            params={"query": title, "primary_release_year": year},
-        )
-        results = response.json().get("results", [])
-        return results[0] if results else None
-    except Exception:
-        return None
-
 
 async def find_on_tmdb(client, title, year):
     # Gemini only gives us a title and year, so look the movie up on TMDB to get its id and poster.

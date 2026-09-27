@@ -51,7 +51,7 @@
     <!-- Generate button (disables itself + shows loading text while Gemini works) -->
     <form method="post" action="/taste" class="mt-8"
           onsubmit="const b = this.querySelector('button'); b.disabled = true; b.textContent = 'Analysing your history… (this takes a few seconds)';">
-        <button type="submit" class="px-5 py-2.5 text-sm font-medium bg-sky-600 text-white hover:bg-sky-700 rounded-md disabled:opacity-60 disabled:cursor-wait">
+        <button type="submit" class="px-5 py-2.5 text-sm font-medium bg-black text-white hover:bg-sky-700 rounded-md disabled:opacity-60 disabled:cursor-wait">
             {% if taste %}Regenerate{% else %}Generate my taste profile{% endif %}
         </button>
     </form>
