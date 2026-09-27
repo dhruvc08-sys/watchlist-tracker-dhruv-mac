@@ -5,13 +5,12 @@ from supabase_client import supabase, new_client, get_user_client
 from urllib.parse import quote_plus
 from fastapi.responses import RedirectResponse, HTMLResponse
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo
 from gemini_client import gemini, MODELS, TasteProfile
 from google.genai import types
 import asyncio
 from uuid import UUID
-from datetime import datetime
 ################################################
 
 app=FastAPI()
@@ -174,8 +173,8 @@ async def add_to_watchlist(
         insert_result = db.table("watchlist_entries").insert({
             "user_id": user.id,
             "tmdb_id": tmdb_id,
-            "title": title,
-            "poster_path": poster_path,
+            "title": details["title"],
+            "poster_path": details.get("poster_path"),
         }).execute()
 
         new_entry_id = insert_result.data[0]["id"]
@@ -225,7 +224,7 @@ async def clear_rating(entry_id: UUID, user = Depends(get_current_user), db = De
 
 
 @app.post("/watchlist/{entry_id}/remove")
-async def remove_entry(entry_id: str, user = Depends(get_current_user), db = Depends(get_db)):
+async def remove_entry(entry_id: UUID, user = Depends(get_current_user), db = Depends(get_db)):
     db.table("watchlist_entries").delete().eq("id", entry_id).eq("user_id", user.id).execute()
     return RedirectResponse(url="/watchlist", status_code=303)
 
@@ -277,42 +276,39 @@ def build_taste_prompt(watched):
         rating = movie["rating"]
         genres_text = ", ".join(movie["genres"])
         if rating is not None:
-            summary.append(f"- {movie["title"]}; rated {rating}/10; genres: {genres_text}")
+            summary.append(f"- {movie['title']}; rated {rating}/10; genres: {genres_text}")
         else:
-            summary.append(f"- {movie["title"]}; not rated; genres: {genres_text}")
+            summary.append(f"- {movie['title']}; not rated; genres: {genres_text}")
 
     movie_list = "\n".join(summary)
 
     return f"""You are an expert in all movies, what they're about, their genre and taste.
     You are responsible, as an advisor, to read and understand someone's watch history and generate 
     a taste profile which will involve curating what genres they lean towards and what movies you personally
-    reccomend for them depending on their taste profile. 
+    recommend for them depending on their taste profile. 
 
     Their watch history will include the title of each movie, what they rated the movie out of 10 (so you
     can understand the person's own enjoyment of the movie) and a list of genres that movie covers.
     
     **Rules**
     
-    - What to write for the profile / what the output should look like: a short one-line headline, plus a paragraph
+    - What to write for the profile / what the output should look like: a short one-line headline, plus 2-3 lines
     on the genres, themes, or kinds of story they lean towards, and what their rating suggests about what they love
 
-    - When providing movie reccomendations, provide 3
+    - When providing movie recommendations, provide 3
 
     - Grounding: every reason must name at least one specific movie from their watch history and explain the connection
     in a couple of words.
 
-    - What not to reccomend: do not recommend anything already in their watch history
+    - What not to recommend: do not recommend anything already in their watch history
 
     - What to do with unrated movies: if a movie is "not rated", it means it they have watched it,
-    but are they yet to rate it. It doesn't mean they didn't like the movie. 
+    but are yet to rate it. It doesn't mean they didn't like the movie. 
     
     Here is their watch history:
     {movie_list}
     """
     
-
-
-
 @app.post("/taste")
 async def generate_taste(request: Request, user = Depends(get_current_user), db = Depends(get_db)):
     watched = get_watched_with_genres(db, user.id)
