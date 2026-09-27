@@ -4,11 +4,11 @@ from supabase import create_client
 
 load_dotenv()
 
-# Shared client - ONLY used to check who a token belongs to (get_user). Never sign in with it.
+# Shared client: used to check who a token belongs to (get_user)
 supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"])
 
 def new_client():
-    # Fresh client for sign up / sign in, so the shared one never becomes "signed in"
+    # Fresh client for sign up / sign in
     return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"])
 
 def get_user_client(access_token):

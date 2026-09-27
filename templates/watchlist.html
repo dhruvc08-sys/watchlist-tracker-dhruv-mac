@@ -51,7 +51,7 @@
     </div>
 {% else %}
 
-    <!-- Watchlist: not watched yet -->
+    <!-- Section A: Not watched yet -->
     <h2 class="text-xl font-semibold mt-10">Watchlist <span class="text-zinc-400 font-normal">{{ to_watch | length }}</span></h2>
     {% if to_watch %}
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mt-4">
@@ -61,7 +61,7 @@
         <p class="text-sm text-zinc-500 mt-2">Nothing left to watch. <a href="/" class="text-sky-700 hover:underline">Find something new</a>.</p>
     {% endif %}
 
-    <!-- Watched -->
+    <!-- Section B: Watched -->
     <h2 class="text-xl font-semibold mt-12">Watched <span class="text-zinc-400 font-normal">{{ watched | length }}</span></h2>
     {% if watched %}
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mt-4">

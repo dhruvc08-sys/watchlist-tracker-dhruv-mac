@@ -11,13 +11,12 @@ from gemini_client import gemini, MODELS, TasteProfile
 from google.genai import types
 import asyncio
 from uuid import UUID
-################################################
+
+###############################################################################
 
 TMDB_READ_TOKEN = os.environ["TMDB_READ_TOKEN"].strip()
 app=FastAPI()
-templates = Jinja2Templates(directory="templates")
-
-# Signing Up 
+templates = Jinja2Templates(directory="templates")  
 
 @app.get("/signup")
 async def signup_page(request: Request):
@@ -26,14 +25,15 @@ async def signup_page(request: Request):
 @app.post("/signup")
 async def signup(request: Request, email: str = Form(...), password: str = Form(...)):
     try:
-        auth_client = new_client()
+        auth_client = new_client()  # fresh client
         result = auth_client.auth.sign_up({"email": email, "password": password})
+        # One profile row per user, where its primary key is the Supabase auth user id
         auth_client.table("profiles").insert({"id": result.user.id}).execute()
         return RedirectResponse(url="/signin", status_code=303) #303 - "see other"
     except Exception as error_message:
+        # if an error is detected (e.g. email already registered), show that clearly on the form
         return templates.TemplateResponse(request=request, name="signup.html", context={"error": str(error_message)})
 
-# Signing In
 
 @app.get("/signin")
 async def signin_page(request: Request):
@@ -45,8 +45,7 @@ async def signin(request: Request, email: str = Form(...), password: str = Form(
     try:
         result = new_client().auth.sign_in_with_password({"email": email, "password": password})
         response = RedirectResponse(url="/", status_code=303)
-        # Supabase access tokens expire (usually after 1 hour). Make the cookies expire at the
-        # same time, so the app never holds a dead token that still "looks" signed in.
+        # Supabase access tokens expire (usually after 1 hour). Make the cookies expire at the same time
         max_age = result.session.expires_in
         response.set_cookie(
             key="session_token",
@@ -54,6 +53,7 @@ async def signin(request: Request, email: str = Form(...), password: str = Form(
             httponly=True,
             max_age=max_age,
         )
+        # Only used to show the email in the nav bar
         response.set_cookie(
             key="user_email",
             value=result.user.email,
@@ -75,6 +75,8 @@ def signin_redirect(request: Request):
     return HTTPException(status_code=303, headers={"Location": "/signin"})
 
 
+# Dependency used by every signed-in page: turns the session cookie into a user,
+# or sends the visitor to /signin if the token is missing, fake or expired.
 def get_current_user(request: Request, session_token: str | None = Cookie(default=None)):
     if session_token is None:
         raise signin_redirect(request)
@@ -85,14 +87,17 @@ def get_current_user(request: Request, session_token: str | None = Cookie(defaul
         raise signin_redirect(request)
 
 
+# Dependency that gives each request its own database client acting as that user,
+# so Row Level Security (auth.uid() = user_id) only ever returns their own rows.
 def get_db(request: Request, session_token: str | None = Cookie(default=None)):
     if session_token is None:
         raise signin_redirect(request)
     return get_user_client(session_token)
 
 
+# Shared by /stats and /taste
 def get_watched_with_genres(db, user_id):
-    # One query: watched entries + their genre names, following entry_genres -> genres
+    # One query: watched entries + their genre names
     rows = (
         db.table("watchlist_entries")
         .select("title, rating, watched_at, entry_genres(genres(name))")
@@ -101,6 +106,7 @@ def get_watched_with_genres(db, user_id):
         .execute()
         .data
     )
+    # Flatten the nested result into {title, rating, genres: ["Drama", ...]}
     watched = []
     for row in rows:
         genres = [eg["genres"]["name"] for eg in row.get("entry_genres", []) if eg.get("genres")]
@@ -108,12 +114,16 @@ def get_watched_with_genres(db, user_id):
     return watched
 
 
+# Signing Out: deleting both cookies (session_token, user_email)
+
 @app.post("/signout")
 async def signout():
     response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie("session_token")
     response.delete_cookie("user_email")
     return response
+
+# Watchlist page
 
 @app.get("/watchlist")
 async def watchlist_page(request: Request, user = Depends(get_current_user), db = Depends(get_db)):
@@ -132,6 +142,8 @@ async def watchlist_page(request: Request, user = Depends(get_current_user), db 
     )
 
 
+# Search page (home). Works signed in or out but signed-in users see which movies they've already added.
+
 @app.get("/")
 async def homepage(request: Request, query: str = "", session_token: str | None = Cookie(default=None)):
     movies = []
@@ -142,7 +154,7 @@ async def homepage(request: Request, query: str = "", session_token: str | None 
                 headers={"Authorization": f"Bearer {TMDB_READ_TOKEN}"},
                 params={"query": query},
             )
-            movies = response.json()["results"]
+            movies = response.json()["results"]  # first page of matches (up to 20)
 
     # Which of these movies has the signed-in user already added?
     added_ids = set()
@@ -152,13 +164,15 @@ async def homepage(request: Request, query: str = "", session_token: str | None 
             rows = get_user_client(session_token).table("watchlist_entries").select("tmdb_id").eq("user_id", user.id).execute().data
             added_ids = {row["tmdb_id"] for row in rows}
         except Exception:
-            pass  # not signed in properly - treat nothing as added
+            pass  # not signed in properly
 
     return templates.TemplateResponse(
         request=request, name="index.html",
         context={"movies": movies, "query": query, "added_ids": added_ids}
     )
 
+
+# Add a movie. Details come from TMDB, so the title/poster can't be faked.
 
 @app.post("/watchlist/add")
 async def add_to_watchlist(
@@ -181,7 +195,7 @@ async def add_to_watchlist(
                 headers={"Authorization": f"Bearer {TMDB_READ_TOKEN}"},
             )
 
-            details_response.raise_for_status()
+            details_response.raise_for_status()  # if bad/unknown tmdb_id detected, then jump to the except below
             details = details_response.json()
 
 
@@ -192,6 +206,7 @@ async def add_to_watchlist(
             "poster_path": details.get("poster_path"),
         }).execute()
 
+        # Link the new entry to its genres (entry_genres join table), used by stats + taste pages
         new_entry_id = insert_result.data[0]["id"]
         genre_ids = [g["id"] for g in details.get("genres", [])]
 
@@ -212,6 +227,7 @@ async def add_to_watchlist(
         
 
 # watch / rate / remove routes
+# entry_id is typed as UUID, so a malformed id is rejected with a 422
 
 @app.post("/watchlist/{entry_id}/watch")
 async def mark_watched(entry_id: UUID, user = Depends(get_current_user), db = Depends(get_db)):
@@ -223,7 +239,7 @@ async def mark_watched(entry_id: UUID, user = Depends(get_current_user), db = De
 
 @app.post("/watchlist/{entry_id}/rate")
 async def rate_movie(entry_id: UUID, rating: int = Form(...), user = Depends(get_current_user), db = Depends(get_db)):
-    if 1 <= rating <= 10:
+    if 1 <= rating <= 10:  # ignore out-of-range ratings sent by editing the form
         db.table("watchlist_entries").update(
             {"rating": rating}
         ).eq("id", entry_id).eq("user_id", user.id).execute()
@@ -243,7 +259,6 @@ async def remove_entry(entry_id: UUID, user = Depends(get_current_user), db = De
     db.table("watchlist_entries").delete().eq("id", entry_id).eq("user_id", user.id).execute()
     return RedirectResponse(url="/watchlist", status_code=303)
 
-# stats
 
 @app.get("/stats")
 async def stats_page(request: Request, user = Depends(get_current_user), db = Depends(get_db)):
@@ -272,11 +287,11 @@ async def stats_page(request: Request, user = Depends(get_current_user), db = De
         },
     )
 
-# taste
+
+# Just shows the page + Generate button. Gemini only runs when the button is pressed
 
 @app.get("/taste")
 async def taste_page(request: Request, user = Depends(get_current_user), db = Depends(get_db)):
-    # Just shows the page + Generate button. Gemini only runs when the button is pressed (POST below).
     watched = get_watched_with_genres(db, user.id)
     return templates.TemplateResponse(
         request=request, name="taste.html",
@@ -284,6 +299,7 @@ async def taste_page(request: Request, user = Depends(get_current_user), db = De
     )
 
 
+# Builds the text prompt for Gemini from the user's watch history + current watchlist
 def build_taste_prompt(watched, to_watch_titles):
     summary = []
     for movie in watched:
@@ -310,7 +326,7 @@ def build_taste_prompt(watched, to_watch_titles):
     - What to write for the profile: a short one-line headline, plus 2-3 sentences on the genres, themes,
     or kinds of story they lean towards, and what their ratings suggest about what they love versus merely like
 
-    - When providing movie recommendations, provide exactly 8
+    - When providing movie recommendations, provide exactly 10
 
     - Grounding: every reason must name at least one specific movie from their watch history and explain the connection
     in a couple of words.
@@ -342,6 +358,8 @@ async def find_on_tmdb(client, title, year):
         return None
 
 
+# Generate the taste profile: ask Gemini, then match its picks to real TMDB movies
+
 @app.post("/taste")
 async def generate_taste(request: Request, user = Depends(get_current_user), db = Depends(get_db)):
     watched = get_watched_with_genres(db, user.id)
@@ -357,6 +375,7 @@ async def generate_taste(request: Request, user = Depends(get_current_user), db 
         to_watch_titles = [row["title"] for row in rows if not row["watched_at"]]
 
         prompt = build_taste_prompt(watched, to_watch_titles)
+        # Try each model in order; if one is overloaded (503) or fails, fall back to the next
         for model in MODELS:
             try:
                 response = await gemini.aio.models.generate_content(
@@ -364,20 +383,20 @@ async def generate_taste(request: Request, user = Depends(get_current_user), db 
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
-                        response_schema=TasteProfile,
+                        response_schema=TasteProfile,  
                     ),
                 )
-                taste = response.parsed
+                taste = response.parsed  
                 print("TASTE OK with", model)
                 break                                  # got an answer, stop trying
             except Exception as error_message:
                 print(f"TASTE FAILED with {model}:", error_message)
-                await asyncio.sleep(1)                 # brief pause before the next model
+                await asyncio.sleep(1)                 # brief pause before the next model (if needed)
 
         if taste is None:
-            error = "Our AI model is busy right now. Please try again in a minute."
+            error = "Our AI model is busy right now. Please try again in a minute." # if all models don't respond
         else:
-            # Look up all recommendations on TMDB 
+            # Look up all recommendations on TMDB at the same time (asyncio.gather), not one after another
             async with httpx.AsyncClient() as client:
                 matches = await asyncio.gather(
                     *[find_on_tmdb(client, rec.movie_name, rec.movie_year) for rec in taste.recommendations]
@@ -393,7 +412,7 @@ async def generate_taste(request: Request, user = Depends(get_current_user), db 
                     "poster_path": match.get("poster_path"),
                     "reason": rec.why_it_fits,
                 })
-                if len(recommendations) == 5:
+                if len(recommendations) == 5:  # Gemini is asked to provide 10, but the first 5 valid ones are shown
                     break
 
     return templates.TemplateResponse(
