@@ -5,7 +5,7 @@ A Letterboxd-style movie tracker. Search for movies, add them to your watchlist,
 - **Name:** Dhruv Chadha
 - **Email:** dhruvchadha08@gmail.com
 - **Deployed app:** https://watchlist-tracker-one.vercel.app
-- **Repo:** https://github.com/dhruvc08-sys/watchlist-tracker
+- **Repo:** https://github.com/dhruvc08-sys/watchlist-tracker-dhruv-mac
 
 ## Stack
 
@@ -29,8 +29,8 @@ A Letterboxd-style movie tracker. Search for movies, add them to your watchlist,
 ## Run locally
 
 ```bash
-git clone https://github.com/dhruvc08-sys/watchlist-tracker.git
-cd watchlist-tracker
+git clone git clone https://github.com/dhruvc08-sys/watchlist-tracker-dhruv-mac.git
+cd cd watchlist-tracker-dhruv-mac
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
